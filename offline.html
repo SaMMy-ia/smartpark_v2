@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-MZ">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <title>Offline - SmartPark</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1E3A8A',
+                        secondary: '#10B981',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .float-animation {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.95);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.05);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(0.95);
+                opacity: 1;
+            }
+        }
+        
+        .pulse-ring {
+            animation: pulse-ring 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-green-50 dark:from-gray-900 dark:to-gray-800 min-h-screen flex items-center justify-center">
+    
+    <div class="max-w-md w-full px-6 text-center">
+        <!-- Offline Icon -->
+        <div class="mb-8 relative inline-block">
+            <div class="absolute inset-0 bg-red-500 opacity-20 rounded-full pulse-ring"></div>
+            <div class="relative bg-white dark:bg-gray-800 rounded-full p-8 shadow-2xl float-animation">
+                <i class="fas fa-wifi-slash text-6xl text-red-500"></i>
+            </div>
+        </div>
+        
+        <!-- Title -->
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+            Você está offline
+        </h1>
+        
+        <!-- Description -->
+        <p class="text-lg text-gray-600 dark:text-gray-400 mb-8">
+            Não foi possível conectar ao servidor SmartPark. Verifique sua conexão com a internet e tente novamente.
+        </p>
+        
+        <!-- Info Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-8">
+            <div class="flex items-start space-x-4 mb-4">
+                <i class="fas fa-info-circle text-2xl text-blue-500 mt-1"></i>
+                <div class="text-left">
+                    <h3 class="font-semibold text-gray-900 dark:text-white mb-2">Modo Offline</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Algumas páginas visitadas recentemente podem estar disponíveis no cache. 
+                        Funcionalidades que requerem conexão estarão temporariamente indisponíveis.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="space-y-4">
+            <button onclick="window.location.reload()" 
+                    class="w-full bg-primary hover:bg-blue-900 text-white font-semibold py-4 px-6 rounded-lg transition transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
+                <i class="fas fa-sync-alt"></i>
+                <span>Tentar Novamente</span>
+            </button>
+            
+            <button onclick="goBack()" 
+                    class="w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-4 px-6 rounded-lg transition transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
+                <i class="fas fa-arrow-left"></i>
+                <span>Voltar</span>
+            </button>
+        </div>
+        
+        <!-- Quick Links -->
+        <div class="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Páginas em cache:</p>
+            <div class="flex flex-wrap justify-center gap-2" id="cachedPages">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <!-- Connection Status -->
+        <div class="mt-8 flex items-center justify-center space-x-2 text-sm">
+            <div id="statusIndicator" class="w-3 h-3 rounded-full bg-red-500"></div>
+            <span id="statusText" class="text-gray-600 dark:text-gray-400">Sem conexão</span>
+        </div>
+    </div>
+    
+    <script>
+        // Função para voltar
+        function goBack() {
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = '/smartpark/index.php';
+            }
+        }
+        
+        // Monitorar status de conexão
+        function updateOnlineStatus() {
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+            
+            if (navigator.onLine) {
+                indicator.className = 'w-3 h-3 rounded-full bg-green-500';
+                text.textContent = 'Conexão restaurada!';
+                text.className = 'text-green-600 dark:text-green-400 font-semibold';
+                
+                // Recarrega após 1 segundo
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                indicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                text.textContent = 'Sem conexão';
+                text.className = 'text-gray-600 dark:text-gray-400';
+            }
+        }
+        
+        // Listeners para mudanças de conexão
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        
+        // Verificar status inicial
+        updateOnlineStatus();
+        
+        // Listar páginas em cache (se disponível)
+        if ('caches' in window) {
+            caches.keys().then(cacheNames => {
+                const cachedPagesDiv = document.getElementById('cachedPages');
+                
+                const commonPages = [
+                    { url: '/smartpark/index.php', name: 'Login', icon: 'fa-sign-in-alt' },
+                    { url: '/smartpark/usuario/dashboard.php', name: 'Dashboard', icon: 'fa-chart-line' },
+                    { url: '/smartpark/usuario/buscar-vagas.php', name: 'Buscar Vagas', icon: 'fa-search' },
+                    { url: '/smartpark/usuario/minhas-reservas.php', name: 'Reservas', icon: 'fa-calendar' }
+                ];
+                
+                commonPages.forEach(page => {
+                    const link = document.createElement('a');
+                    link.href = page.url;
+                    link.className = 'inline-flex items-center space-x-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 transition';
+                    link.innerHTML = `<i class="fas ${page.icon}"></i><span>${page.name}</span>`;
+                    cachedPagesDiv.appendChild(link);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
