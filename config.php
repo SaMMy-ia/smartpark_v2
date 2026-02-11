@@ -8,7 +8,7 @@
 // DATABASE
 // =========================
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'smartpark_v6');
+define('DB_NAME', 'smartpark_v9');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 
@@ -42,7 +42,7 @@ define('SESSION_TIMEOUT', 1200);
 
 // Configurar cookie de sessão ANTES do session_start
 if (session_status() === PHP_SESSION_NONE) {
-
+    session_name('SMARTPARK_SESSION_V8');
     session_set_cookie_params([
         'lifetime' => 0, // sessão morre ao fechar navegador
         'path' => '/',
@@ -63,13 +63,15 @@ if (session_status() === PHP_SESSION_NONE) {
 // =========================
 
 // destrói sessão por inatividade
-if (isset($_SESSION['LAST_ACTIVITY']) &&
-   (time() - $_SESSION['LAST_ACTIVITY'] > SESSION_TIMEOUT)) {
+if (
+    isset($_SESSION['LAST_ACTIVITY']) &&
+    (time() - $_SESSION['LAST_ACTIVITY'] > SESSION_TIMEOUT)
+) {
 
     session_unset();
     session_destroy();
 
-    header("Location: /smartpark/index.php?session_expired=1");
+    header("Location: /smartpark/login?session_expired=1");
     exit;
 }
 

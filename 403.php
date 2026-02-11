@@ -23,7 +23,7 @@ require_once __DIR__ . '/includes/header.php';
                 <i class="fas fa-arrow-left mr-2"></i> Voltar
             </a>
             <span class="mx-2 text-gray-300">|</span>
-            <a href="/smartpark/index.php" class="font-medium text-primary hover:text-blue-500">
+            <a href="/smartpark/" class="font-medium text-primary hover:text-blue-500">
                 Ir para o Início
             </a>
         </div>

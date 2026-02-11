@@ -3,7 +3,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/functions.php';
 requireRole('usuario');
 
-$reservaId = isset($_GET['reserva']) ? (int)$_GET['reserva'] : null;
+$reservaId = isset($_GET['reserva']) ? (int) $_GET['reserva'] : null;
 $somenteMultas = isset($_GET['multa']) && $_GET['multa'] == 1;
 
 // Se não tiver reserva nem pagamento de multa, redireciona
@@ -42,7 +42,7 @@ if (!$somenteMultas && $reserva) {
     ");
     $stmt->execute([$reservaId]);
     $pagamentoExistente = $stmt->fetch();
-    
+
     if (!$pagamentoExistente || $pagamentoExistente['status'] !== 'pago') {
         $valorReservaPendente = $reserva['valor_total'];
     }
@@ -74,40 +74,57 @@ $descricaoCompleta = implode(' + ', $descricao);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $metodo = $_POST['metodo'];
 
-    // Pagar reserva pendente
-    if ($valorReservaPendente > 0) {
-        $stmt = $pdo->prepare("
-            INSERT INTO pagamentos (reserva_id, metodo, status, valor, descricao, data_pagamento)
-            VALUES (?, ?, 'pago', ?, ?, NOW())
-        ");
-        $stmt->execute([$reservaId, $metodo, $valorReservaPendente, "Pagamento da reserva"]);
-        
-        // Atualizar status da reserva
-        $stmt = $pdo->prepare("UPDATE reservas SET status = 'ativa' WHERE id = ?");
-        $stmt->execute([$reservaId]);
+    try {
+        $pdo->beginTransaction();
+
+        // 1. Handle pending reservation status
+        if ($valorReservaPendente > 0 && $reserva) {
+            $stmt = $pdo->prepare("UPDATE reservas SET status = 'ativa' WHERE id = ?");
+            $stmt->execute([$reservaId]);
+        }
+
+        // 2. Handle all pending fines for this user
+        if ($totalMultas > 0) {
+            $stmt = $pdo->prepare("
+                UPDATE reservas
+                SET status = 'concluida', valor_multa = 0
+                WHERE usuario_id = ? AND status = 'em_multa'
+            ");
+            $stmt->execute([$_SESSION['user_id']]);
+        }
+
+        // 3. Register ONE consolidated payment
+        // We link to the current reservaId if available, otherwise find one of the reservations associated with the fines
+        $targetReservaId = $reservaId;
+
+        if (!$targetReservaId && $totalMultas > 0) {
+            // Find any reservation from this user to satisfy NOT NULL constraint
+            $stmt = $pdo->prepare("SELECT id FROM reservas WHERE usuario_id = ? LIMIT 1");
+            $stmt->execute([$_SESSION['user_id']]);
+            $tempReserva = $stmt->fetch();
+            $targetReservaId = $tempReserva ? $tempReserva['id'] : null;
+        }
+
+        if ($targetReservaId) {
+            $stmt = $pdo->prepare("
+                INSERT INTO pagamentos (reserva_id, metodo, status, valor, descricao, data_pagamento)
+                VALUES (?, ?, 'pago', ?, ?, NOW())
+            ");
+            $stmt->execute([$targetReservaId, $metodo, $valorPagar, $descricaoCompleta]);
+
+            logAction($_SESSION['user_id'], "Pagamento realizado: $descricaoCompleta via $metodo");
+            $pdo->commit();
+            redirectWithMessage('/SmartPark/usuario/minhas-reservas.php', 'Pagamento realizado com sucesso!');
+        } else {
+            throw new Exception("Não foi possível identificar uma reserva para vincular o pagamento.");
+        }
+
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $error = "Erro ao processar pagamento: " . $e->getMessage();
     }
-
-    // Pagar todas as multas
-    if ($totalMultas > 0) {
-        $stmt = $pdo->prepare("
-            UPDATE reservas
-            SET status = 'concluida', valor_multa = 0
-            WHERE usuario_id = ? AND status = 'em_multa'
-        ");
-        $stmt->execute([$_SESSION['user_id']]);
-    }
-
-    // Registrar pagamento geral (reserva + multas)
-    $reservaParaPagamento = $somenteMultas ? 0 : $reservaId;
-    $stmt = $pdo->prepare("
-        INSERT INTO pagamentos (reserva_id, metodo, status, valor, descricao, data_pagamento)
-        VALUES (?, ?, 'pago', ?, ?, NOW())
-    ");
-    $stmt->execute([$reservaParaPagamento, $metodo, $valorPagar, $descricaoCompleta]);
-
-    logAction($_SESSION['user_id'], "Pagamento realizado: $descricaoCompleta via $metodo");
-
-    redirectWithMessage('/SmartPark/usuario/minhas-reservas.php', 'Pagamento realizado com sucesso!');
 }
 
 require_once __DIR__ . '/../includes/header.php';
@@ -129,7 +146,8 @@ require_once __DIR__ . '/../includes/header.php';
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Resumo do Pagamento</h3>
             <?php if (!empty($descricaoCompleta)): ?>
                 <p class="text-gray-700 dark:text-gray-300"><?php echo $descricaoCompleta; ?></p>
-                <p class="mt-2 font-bold text-3xl text-primary dark:text-secondary"><?php echo formatCurrency($valorPagar); ?></p>
+                <p class="mt-2 font-bold text-3xl text-primary dark:text-secondary">
+                    <?php echo formatCurrency($valorPagar); ?></p>
             <?php else: ?>
                 <p class="text-gray-500 dark:text-gray-400">Nenhum pagamento pendente.</p>
             <?php endif; ?>
@@ -151,7 +169,8 @@ require_once __DIR__ . '/../includes/header.php';
             <?php else: ?>
                 <form method="POST" action="" id="paymentForm">
                     <div class="space-y-4">
-                        <label class="flex items-center p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary dark:hover:border-secondary transition">
+                        <label
+                            class="flex items-center p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary dark:hover:border-secondary transition">
                             <input type="radio" name="metodo" value="cartao" required class="mr-3">
                             <i class="fas fa-credit-card text-2xl text-primary dark:text-secondary mr-3"></i>
                             <div>
@@ -160,16 +179,18 @@ require_once __DIR__ . '/../includes/header.php';
                             </div>
                         </label>
 
-                        <label class="flex items-center p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary dark:hover:border-secondary transition">
+                        <label
+                            class="flex items-center p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary dark:hover:border-secondary transition">
                             <input type="radio" name="metodo" value="pix" required class="mr-3">
                             <i class="fas fa-qrcode text-2xl text-primary dark:text-secondary mr-3"></i>
                             <div>
-                                <p class="font-semibold text-gray-900 dark:text-white">PIX</p>
+                                <p class="font-semibold text-gray-900 dark:text-white">Mpesa / Emola</p>
                                 <p class="text-sm text-gray-600 dark:text-gray-400">Transferência instantânea</p>
                             </div>
                         </label>
 
-                        <label class="flex items-center p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary dark:hover:border-secondary transition">
+                        <label
+                            class="flex items-center p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary dark:hover:border-secondary transition">
                             <input type="radio" name="metodo" value="boleto" required class="mr-3">
                             <i class="fas fa-barcode text-2xl text-primary dark:text-secondary mr-3"></i>
                             <div>
@@ -185,7 +206,8 @@ require_once __DIR__ . '/../includes/header.php';
                             </p>
                         </div>
 
-                        <button type="submit" class="w-full px-6 py-3 bg-primary dark:bg-secondary text-white rounded-lg font-semibold hover:bg-blue-900 dark:hover:bg-green-600 transition shadow-lg">
+                        <button type="submit"
+                            class="w-full px-6 py-3 bg-primary dark:bg-secondary text-white rounded-lg font-semibold hover:bg-blue-900 dark:hover:bg-green-600 transition shadow-lg">
                             <i class="fas fa-check mr-2"></i> Confirmar Pagamento
                         </button>
                     </div>

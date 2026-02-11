@@ -102,8 +102,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <td>
                                 <?php if (in_array($r['status'], ['ativa', 'em_multa'])): ?>
                                     <a href="liberar_reserva.php?id=<?php echo $r['id']; ?>"
-                                       onclick="return confirm('Confirmar saída do veículo e liberar vaga?')"
-                                       class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                                       class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold btn-liberar-vaga">
                                         Liberar vaga
                                     </a>
                                 <?php elseif ($r['status'] === 'vaga_liberada'): ?>
@@ -121,6 +120,27 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+document.querySelectorAll('.btn-liberar-vaga').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const url = this.getAttribute('href');
+        Swal.fire({
+            title: 'Liberar Vaga',
+            text: 'Confirmar saída do veículo e liberar vaga?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10B981',
+            cancelButtonColor: '#6B7280',
+            confirmButtonText: 'Sim, liberar',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = url;
+            }
+        });
+    });
+});
+
 function filterTable(inputId, tableId) {
     const input = document.getElementById(inputId).value.toUpperCase();
     const table = document.getElementById(tableId);

@@ -1,0 +1,36 @@
+# SmartPark - Configurações Apache
+# Centraliza rotas e aumenta segurança
+
+# 1. Impedir listagem de diretórios
+Options -Indexes
+
+# 2. Configurações de Roteamento
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # BasePath automático ou fixo dependendo do ambiente
+    RewriteBase /smartpark/
+
+    # Bloquear acesso direto a arquivos .php
+    # Redireciona /login.php para /login
+    RewriteCond %{THE_REQUEST} \s/smartpark/+(.+)\.php[\s?] [NC]
+    RewriteRule ^ /smartpark/%1 [R=301,L]
+
+    # Redirecionar tudo para o index.php, exceto arquivos reais (CSS, JS, imagens)
+    # Removemos a condição !-d para que diretórios (como /admin/) também passem pelo router
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# 3. Proteção de arquivos e pastas sensíveis
+RewriteRule ^includes/.*$ - [F,L]
+RewriteRule ^migrations/.*$ - [F,L]
+RewriteRule ^\.git/.*$ - [F,L]
+
+# Bloquear acesso direto ao config e arquivos de dados
+RewriteRule ^config\.php$ - [F,L]
+RewriteRule \.(sql|log|json|md|txt)$ - [F,L]
+
+# 4. Tratamento de Erros Personalizados
+ErrorDocument 404 /smartpark/errors/404.php
+ErrorDocument 403 /smartpark/403.php
